@@ -18,8 +18,10 @@ def parse_test_durations(log_file: str) -> List[Tuple[str, float]]:
     Returns:
         List of tuples (test_name, duration_seconds)
     """
-    pattern = re.compile(r'<<<<= (.+?)\s+duration_ms=(\d+)')
+    # Support both log formats: "<<<<= " (old) and "<<<< " (new)
+    pattern = re.compile(r'<<<<[=]?\s+(.+?)\s+duration_ms=(\d+)')
     durations = []
+    seen = {}  # Track test names to avoid duplicates
 
     with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
         for line in f:
@@ -28,7 +30,11 @@ def parse_test_durations(log_file: str) -> List[Tuple[str, float]]:
                 test_name = match.group(1)
                 duration_ms = int(match.group(2))
                 duration_sec = duration_ms / 1000.0
-                durations.append((test_name, duration_sec))
+
+                # Only keep the first occurrence of each test
+                if test_name not in seen:
+                    seen[test_name] = duration_sec
+                    durations.append((test_name, duration_sec))
 
     return durations
 
