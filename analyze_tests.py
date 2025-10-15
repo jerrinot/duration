@@ -3,7 +3,7 @@
 Analyze test durations from log files and find the longest running tests.
 """
 import sys
-from duration_lib import parse_test_durations, format_duration
+from duration_lib import parse_test_durations, format_duration, print_histogram
 
 
 def analyze_tests(log_file: str, top_n: int = 20):
@@ -38,6 +38,10 @@ def analyze_tests(log_file: str, top_n: int = 20):
     print(f"Average duration: {format_duration(avg_duration)}")
     print(f"Max duration: {format_duration(max_duration)}")
     print(f"Min duration: {format_duration(min_duration)}")
+
+    # Print histogram of test durations
+    duration_values = [d[1] for d in durations]
+    print_histogram(duration_values, "TEST DURATION DISTRIBUTION")
 
     print(f"\n{'='*80}")
     print(f"TOP {min(top_n, total_tests)} LONGEST RUNNING TESTS")

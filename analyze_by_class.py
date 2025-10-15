@@ -10,7 +10,8 @@ from duration_lib import (
     extract_class,
     group_by,
     calculate_cumulative_distribution,
-    suggest_parallel_splits
+    suggest_parallel_splits,
+    print_histogram
 )
 
 
@@ -50,6 +51,10 @@ def analyze_by_class(log_file: str, top_n: int = 20, show_tests: bool = False):
     print(f"Total tests: {total_tests}")
     print(f"Total duration: {format_duration(total_duration)}")
     print(f"Average tests per class: {total_tests / total_classes:.1f}")
+
+    # Print histogram of class total durations
+    class_durations = [info['total_duration'] for _, info in sorted_classes]
+    print_histogram(class_durations, "CLASS DURATION DISTRIBUTION")
 
     print(f"\n{'='*80}")
     print(f"TOP {min(top_n, total_classes)} TEST CLASSES BY TOTAL DURATION")

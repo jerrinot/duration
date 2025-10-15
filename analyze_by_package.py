@@ -10,7 +10,8 @@ from duration_lib import (
     extract_package,
     group_by,
     calculate_cumulative_distribution,
-    suggest_parallel_splits
+    suggest_parallel_splits,
+    print_histogram
 )
 
 
@@ -50,6 +51,10 @@ def analyze_by_package(log_file: str, top_n: int = 20, show_tests: bool = False)
     print(f"Total tests: {total_tests}")
     print(f"Total duration: {format_duration(total_duration)}")
     print(f"Average tests per package: {total_tests / total_packages:.1f}")
+
+    # Print histogram of package total durations
+    package_durations = [info['total_duration'] for _, info in sorted_packages]
+    print_histogram(package_durations, "PACKAGE DURATION DISTRIBUTION")
 
     print(f"\n{'='*80}")
     print(f"TOP {min(top_n, total_packages)} PACKAGES BY TOTAL DURATION")
