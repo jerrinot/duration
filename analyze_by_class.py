@@ -3,96 +3,15 @@
 Analyze test durations grouped by Java test class.
 Helps identify how to split tests for parallel execution.
 """
-import re
 import sys
-from collections import defaultdict
-from typing import Dict, List, Tuple
-
-
-def parse_test_durations(log_file: str) -> List[Tuple[str, float]]:
-    """
-    Parse test durations from a log file.
-
-    Args:
-        log_file: Path to the log file
-
-    Returns:
-        List of tuples (test_name, duration_seconds)
-    """
-    pattern = re.compile(r'<<<<= (.+?)\s+duration_ms=(\d+)')
-    durations = []
-
-    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                test_name = match.group(1)
-                duration_ms = int(match.group(2))
-                duration_sec = duration_ms / 1000.0
-                durations.append((test_name, duration_sec))
-
-    return durations
-
-
-def extract_class(test_name: str) -> str:
-    """
-    Extract class name from full test name.
-
-    Example: com.questdb.acl.AccessControlTest.testMethod[WITH_WAL]
-             -> com.questdb.acl.AccessControlTest
-
-    Args:
-        test_name: Full test name
-
-    Returns:
-        Class name (package + class)
-    """
-    # Remove parameter part [WITH_WAL] if present
-    test_name = test_name.split('[')[0]
-
-    # Split by dots and take all but the last part (methodName)
-    parts = test_name.split('.')
-    if len(parts) >= 2:
-        # Return all except methodName
-        return '.'.join(parts[:-1])
-    else:
-        return test_name
-
-
-def group_by_class(durations: List[Tuple[str, float]]) -> Dict[str, dict]:
-    """
-    Group test durations by class.
-
-    Args:
-        durations: List of (test_name, duration_seconds)
-
-    Returns:
-        Dict mapping class -> {total_duration, test_count, tests: [(name, duration)]}
-    """
-    classes = defaultdict(lambda: {'total_duration': 0.0, 'test_count': 0, 'tests': []})
-
-    for test_name, duration in durations:
-        class_name = extract_class(test_name)
-        classes[class_name]['total_duration'] += duration
-        classes[class_name]['test_count'] += 1
-        classes[class_name]['tests'].append((test_name, duration))
-
-    return classes
-
-
-def format_duration(seconds: float) -> str:
-    """Format duration in a human-readable format."""
-    if seconds < 60:
-        return f"{seconds:.2f}s"
-    elif seconds < 3600:
-        minutes = int(seconds // 60)
-        secs = seconds % 60
-        return f"{minutes}m {secs:.2f}s"
-    else:
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = seconds % 60
-        return f"{hours}h {minutes}m {secs:.2f}s"
+from duration_lib import (
+    parse_test_durations,
+    format_duration,
+    extract_class,
+    group_by,
+    calculate_cumulative_distribution,
+    suggest_parallel_splits
+)
 
 
 def analyze_by_class(log_file: str, top_n: int = 20, show_tests: bool = False):
@@ -113,7 +32,7 @@ def analyze_by_class(log_file: str, top_n: int = 20, show_tests: bool = False):
         print("No test durations found in the log file.")
         return
 
-    classes = group_by_class(durations)
+    classes = group_by(durations, extract_class)
 
     # Sort classes by total duration (descending)
     sorted_classes = sorted(
@@ -162,18 +81,14 @@ def analyze_by_class(log_file: str, top_n: int = 20, show_tests: bool = False):
     print("CUMULATIVE DISTRIBUTION (for parallel execution planning)")
     print(f"{'='*80}")
 
-    cumulative = 0.0
     thresholds = [10, 25, 50, 75, 90]
-    threshold_idx = 0
+    cumulative_results = calculate_cumulative_distribution(
+        sorted_classes, thresholds, total_duration
+    )
 
-    for i, (class_name, info) in enumerate(sorted_classes, 1):
-        cumulative += info['total_duration']
-        cumulative_pct = (cumulative / total_duration) * 100
-
-        if threshold_idx < len(thresholds) and cumulative_pct >= thresholds[threshold_idx]:
-            print(f"Top {i} classes account for {cumulative_pct:.1f}% of total duration "
-                  f"({format_duration(cumulative)})")
-            threshold_idx += 1
+    for count, pct, cumulative in cumulative_results:
+        print(f"Top {count} classes account for {pct:.1f}% of total duration "
+              f"({format_duration(cumulative)})")
 
     # Suggest split strategies
     print(f"\n{'='*80}")
@@ -185,19 +100,11 @@ def analyze_by_class(log_file: str, top_n: int = 20, show_tests: bool = False):
         target_duration = total_duration / num_runners
         print(f"\nFor {num_runners} parallel runners (target: {format_duration(target_duration)} each):")
 
-        runners = [[] for _ in range(num_runners)]
-        runner_durations = [0.0] * num_runners
+        splits = suggest_parallel_splits(sorted_classes, num_runners, total_duration)
 
-        # Greedy bin packing: assign each class to the runner with least total time
-        for class_name, info in sorted_classes:
-            min_idx = runner_durations.index(min(runner_durations))
-            runners[min_idx].append(class_name)
-            runner_durations[min_idx] += info['total_duration']
-
-        for i, (runner_classes, duration) in enumerate(zip(runners, runner_durations), 1):
-            pct = (duration / total_duration) * 100
-            print(f"  Runner {i}: {format_duration(duration):<12} ({pct:>5.1f}%) - "
-                  f"{len(runner_classes)} classes")
+        for i, split in enumerate(splits, 1):
+            print(f"  Runner {i}: {format_duration(split['duration']):<12} "
+                  f"({split['percentage']:>5.1f}%) - {len(split['items'])} classes")
 
 
 def main():

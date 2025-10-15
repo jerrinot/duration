@@ -2,53 +2,8 @@
 """
 Analyze test durations from log files and find the longest running tests.
 """
-import re
 import sys
-from collections import defaultdict
-from typing import List, Tuple
-
-
-def parse_test_durations(log_file: str) -> List[Tuple[str, float]]:
-    """
-    Parse test durations from a log file.
-
-    Args:
-        log_file: Path to the log file
-
-    Returns:
-        List of tuples (test_name, duration_seconds)
-    """
-    # Pattern to match test completion lines with duration
-    # Example: <<<<= com.questdb.acl.AccessControlConcurrentTest.testRevokeAllConcurrentTableLevel[WITH_WAL] duration_ms=4001
-    pattern = re.compile(r'<<<<= (.+?)\s+duration_ms=(\d+)')
-
-    durations = []
-
-    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                test_name = match.group(1)
-                duration_ms = int(match.group(2))
-                duration_sec = duration_ms / 1000.0
-                durations.append((test_name, duration_sec))
-
-    return durations
-
-
-def format_duration(seconds: float) -> str:
-    """Format duration in a human-readable format."""
-    if seconds < 60:
-        return f"{seconds:.2f}s"
-    elif seconds < 3600:
-        minutes = int(seconds // 60)
-        secs = seconds % 60
-        return f"{minutes}m {secs:.2f}s"
-    else:
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = seconds % 60
-        return f"{hours}h {minutes}m {secs:.2f}s"
+from duration_lib import parse_test_durations, format_duration
 
 
 def analyze_tests(log_file: str, top_n: int = 20):
