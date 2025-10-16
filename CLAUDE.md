@@ -37,6 +37,13 @@ This is a Python-based test duration analysis tool designed to parse and analyze
    - Uses greedy bin packing algorithm to suggest optimal class distribution across runners
    - Includes histogram visualization of class duration distribution
 
+4. **`analyze_duplicates.py`** - Multi-log duplicate detection for validating parallel splits
+   - Detects overlapping tests across multiple log files (same test running in multiple places)
+   - Analyzes duplicates at test, class, and package levels
+   - Calculates wasted time from duplicate test executions
+   - Evaluates load balance across runners
+   - Provides recommendations for clean test distribution
+
 **Testing**:
 - **`test_duration_lib.py`** - Comprehensive unit tests for `duration_lib.py` using Python's unittest framework
 
@@ -96,6 +103,20 @@ python3 analyze_by_class.py 150 30
 python3 analyze_by_class.py 150 15 --show-tests
 ```
 
+**Duplicate detection (validate parallel splits):**
+```bash
+python3 analyze_duplicates.py <log_file1> <log_file2> [log_file3 ...] [--show-details]
+```
+
+- `log_file1`, `log_file2`, etc.: Paths to log files from different runners/splits
+- `--show-details`: Show detailed lists of duplicate items
+
+Examples:
+```bash
+python3 analyze_duplicates.py runner1.log runner2.log runner3.log
+python3 analyze_duplicates.py logs/shard*.log --show-details
+```
+
 **Running tests:**
 ```bash
 python3 test_duration_lib.py
@@ -107,6 +128,15 @@ The package and class analysis scripts output:
 - Total duration per package/class with test counts and average duration per test
 - Cumulative distribution showing which packages/classes account for most test time
 - Parallel execution suggestions for 2, 4, and 8 runners using greedy bin packing
+
+The duplicate detection script outputs:
+- Overall statistics (unique tests/classes/packages, total duration)
+- Test-level analysis showing duplicate tests and wasted time
+- Class-level analysis showing classes split across logs
+- Package-level analysis showing packages split across logs
+- Distribution analysis comparing test counts and durations across logs
+- Balance metrics (balance ratio, max/min/avg durations)
+- Summary with actionable recommendations for improving test distribution
 
 ## Code Structure
 
@@ -133,6 +163,10 @@ The package and class analysis scripts output:
 **`analyze_by_class.py` functions:**
 - `analyze_by_class(log_file, top_n, show_tests)`: Main analysis showing class-level statistics, histogram, cumulative distribution, and parallel execution suggestions
 - `main()`: Entry point with support for `--show-tests` flag
+
+**`analyze_duplicates.py` functions:**
+- `analyze_duplicates(log_files, show_details)`: Main analysis detecting duplicate tests across multiple log files; reports at test, class, and package levels; calculates balance metrics and wasted time
+- `main()`: Entry point handling multiple log file arguments and `--show-details` flag
 
 **`test_duration_lib.py` test classes:**
 - `TestParsing`: Tests for `parse_test_durations()` including edge cases and multiple log formats
@@ -185,5 +219,13 @@ The package and class analysis scripts output:
 - Over 2 minutes (120s)
 - Over 5 minutes (300s)
 - Over 10 minutes (600s)
+
+**Duplicate Detection Algorithm** (`analyze_duplicates.py`):
+- Parses multiple log files and tracks test occurrences across all files
+- Uses dictionaries to map test names/classes/packages to the log files they appear in
+- Identifies items appearing in 2+ logs (duplicates) at test, class, and package granularity
+- Calculates wasted time by multiplying test duration by (occurrences - 1)
+- Computes balance ratio as min_duration/max_duration (1.0 = perfect balance)
+- Provides actionable recommendations based on findings
 
 **Error Handling**: All scripts use `errors='ignore'` when reading log files to handle encoding issues in large CI logs
