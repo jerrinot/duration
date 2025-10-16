@@ -44,6 +44,14 @@ This is a Python-based test duration analysis tool designed to parse and analyze
    - Evaluates load balance across runners
    - Provides recommendations for clean test distribution
 
+5. **`analyze_trends.py`** - Time-series trend analysis for tracking performance changes
+   - Compares multiple log files in chronological order to track duration changes
+   - Detects performance regressions (tests getting slower) and improvements (tests getting faster)
+   - Identifies new and removed tests between baseline and current runs
+   - Calculates volatility metrics for tests with 3+ occurrences (variance, std dev, CV)
+   - Provides overall trend analysis with visualizations and actionable recommendations
+   - Supports configurable thresholds for regression detection
+
 **Testing**:
 - **`test_duration_lib.py`** - Comprehensive unit tests for `duration_lib.py` using Python's unittest framework
 
@@ -117,6 +125,24 @@ python3 analyze_duplicates.py runner1.log runner2.log runner3.log
 python3 analyze_duplicates.py logs/shard*.log --show-details
 ```
 
+**Trend analysis (track performance changes over time):**
+```bash
+python3 analyze_trends.py <log_file1> <log_file2> [log_file3 ...] [OPTIONS]
+```
+
+- `log_file1`, `log_file2`, etc.: Log files in chronological order (oldest to newest)
+- `--show-details`: Show detailed information for all items
+- `--threshold-pct N`: Set percentage threshold for regression detection (default: 20)
+- `--threshold-abs N`: Set absolute threshold in seconds for regression (default: 5)
+
+Examples:
+```bash
+python3 analyze_trends.py logs/baseline.log logs/current.log
+python3 analyze_trends.py logs/150 logs/153 logs/167 logs/176
+python3 analyze_trends.py logs/old.log logs/new.log --threshold-pct 15 --threshold-abs 3
+python3 analyze_trends.py logs/run*.log --show-details
+```
+
 **Running tests:**
 ```bash
 python3 test_duration_lib.py
@@ -137,6 +163,17 @@ The duplicate detection script outputs:
 - Distribution analysis comparing test counts and durations across logs
 - Balance metrics (balance ratio, max/min/avg durations)
 - Summary with actionable recommendations for improving test distribution
+
+The trend analysis script outputs:
+- Overall statistics for each run (test counts, total durations)
+- Total duration trend visualization (ASCII bar chart)
+- Performance regressions (tests that got significantly slower)
+- Performance improvements (tests that got significantly faster)
+- New tests (added since baseline) with their durations
+- Removed tests (present in baseline but missing from current)
+- Most volatile tests (for 3+ runs: high variance, coefficient of variation)
+- Summary with overall trend assessment and prioritized recommendations
+- Critical regressions requiring immediate investigation
 
 ## Code Structure
 
@@ -167,6 +204,15 @@ The duplicate detection script outputs:
 **`analyze_duplicates.py` functions:**
 - `analyze_duplicates(log_files, show_details)`: Main analysis detecting duplicate tests across multiple log files; reports at test, class, and package levels; calculates balance metrics and wasted time
 - `main()`: Entry point handling multiple log file arguments and `--show-details` flag
+
+**`analyze_trends.py` functions:**
+- `calculate_test_trends(test_history, log_files)`: Calculates trend metrics for each test (baseline/current durations, changes, variance, stdev, mean, CV, trend direction)
+- `detect_regressions(test_trends, threshold_pct, threshold_abs)`: Filters and sorts tests that got significantly slower based on thresholds
+- `detect_improvements(test_trends, threshold_pct, threshold_abs)`: Filters and sorts tests that got significantly faster based on thresholds
+- `format_change(change_seconds, change_pct)`: Formats duration changes with appropriate indicators (⬆/⬇/➡)
+- `print_trend_visualization(log_metadata)`: Prints ASCII bar chart showing total duration trend across runs
+- `analyze_trends(log_files, show_details, regression_threshold_pct, regression_threshold_abs)`: Main analysis function performing comprehensive trend analysis across all log files
+- `main()`: Entry point with argument parsing for log files and options
 
 **`test_duration_lib.py` test classes:**
 - `TestParsing`: Tests for `parse_test_durations()` including edge cases and multiple log formats
@@ -227,5 +273,18 @@ The duplicate detection script outputs:
 - Calculates wasted time by multiplying test duration by (occurrences - 1)
 - Computes balance ratio as min_duration/max_duration (1.0 = perfect balance)
 - Provides actionable recommendations based on findings
+
+**Trend Analysis Algorithm** (`analyze_trends.py`):
+- Parses log files in chronological order and builds test history tracking all occurrences
+- For each test appearing in both baseline and current runs:
+  - Calculates absolute change: current_duration - baseline_duration
+  - Calculates relative change: ((current - baseline) / baseline) * 100
+  - For 3+ occurrences: computes variance, standard deviation, mean, and coefficient of variation (CV)
+  - Determines trend: 'volatile' (CV > 30%), 'stable' (|change| < 10% and < 2s), 'improving' (negative change), 'degrading' (positive change)
+- Regression detection: flags tests where relative_change > threshold_pct OR absolute_change > threshold_abs
+- Improvement detection: flags tests where relative_change < -threshold_pct OR absolute_change < -threshold_abs
+- Volatility detection: identifies tests with CV > 30% (high variance relative to mean)
+- New/removed test tracking: compares baseline (first log) test set with current (last log) test set
+- Critical regression flagging: highlights tests with >50% slowdown or >30s added time
 
 **Error Handling**: All scripts use `errors='ignore'` when reading log files to handle encoding issues in large CI logs
