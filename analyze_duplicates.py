@@ -115,7 +115,7 @@ def analyze_duplicates(log_files: List[str], show_details: bool = False):
                                  key=lambda x: len(x[1]), reverse=True)
             for test, files in sorted_dupes[:20]:
                 print(f"    {test}")
-                print(f"      Appears in {len(files)} logs: {', '.join(f'log{log_files.index(f)+1}' for f in files)}")
+                print(f"      Appears in {len(files)} logs: {', '.join(files)}")
     else:
         print("  ✓ No duplicate tests found - excellent!")
 
@@ -143,7 +143,7 @@ def analyze_duplicates(log_files: List[str], show_details: bool = False):
                                  key=lambda x: len(x[1]), reverse=True)
             for class_name, files in sorted_dupes[:20]:
                 print(f"    {class_name}")
-                print(f"      Appears in {len(files)} logs: {', '.join(f'log{log_files.index(f)+1}' for f in files)}")
+                print(f"      Appears in {len(files)} logs: {', '.join(files)}")
     else:
         print("  ✓ No classes span multiple logs")
 
@@ -171,7 +171,7 @@ def analyze_duplicates(log_files: List[str], show_details: bool = False):
                                  key=lambda x: len(x[1]), reverse=True)
             for package_name, files in sorted_dupes:
                 print(f"    {package_name}")
-                print(f"      Appears in {len(files)} logs: {', '.join(f'log{log_files.index(f)+1}' for f in files)}")
+                print(f"      Appears in {len(files)} logs: {', '.join(files)}")
     else:
         print("  ✓ No packages span multiple logs")
 
